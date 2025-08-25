@@ -15,7 +15,7 @@ app.use(helmet({
         directives: {
             defaultSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
             imgSrc: ["'self'", "data:", "https:"],
         },
     },
@@ -57,57 +57,175 @@ const validateConfig = () => {
 
 validateConfig();
 
-// Función para buscar en Azure AI Search
+// Función mejorada para buscar en Azure AI Search
 async function searchDocuments(query) {
     const searchUrl = `${process.env.AZURE_SEARCH_ENDPOINT}/indexes/${process.env.AZURE_SEARCH_INDEX}/docs/search?api-version=2023-11-01`;
     
     try {
-        const response = await axios.post(searchUrl, {
+        console.log(`🔍 Buscando: "${query}" en índice: ${process.env.AZURE_SEARCH_INDEX}`);
+        
+        // Búsqueda básica primero, sin dependencias semánticas
+        const searchPayload = {
             search: query,
             top: 5,
             select: '*',
-            queryType: 'semantic',
-            semanticConfiguration: 'default',
-            captions: 'extractive',
-            answers: 'extractive'
-        }, {
+            searchMode: 'any',
+            queryType: 'simple',
+            highlight: 'content_text,document_title,content_id',
+            highlightPreTag: '<mark>',
+            highlightPostTag: '</mark>'
+        };
+
+        // Solo agregar configuración semántica si está disponible
+        if (process.env.AZURE_SEARCH_SEMANTIC_CONFIG) {
+            searchPayload.queryType = 'semantic';
+            searchPayload.semanticConfiguration = process.env.AZURE_SEARCH_SEMANTIC_CONFIG || 'default';
+            searchPayload.captions = 'extractive';
+            searchPayload.answers = 'extractive';
+        }
+        
+        const response = await axios.post(searchUrl, searchPayload, {
             headers: {
                 'Content-Type': 'application/json',
                 'api-key': process.env.AZURE_SEARCH_KEY
             }
         });
         
-        return response.data.value || [];
+        const results = response.data.value || [];
+        console.log(`📄 Encontrados ${results.length} documentos`);
+        
+        // Log de la estructura del primer documento para debug
+        if (results.length > 0) {
+            console.log('📋 Estructura del primer documento:', Object.keys(results[0]));
+        }
+        
+        return results;
+        
     } catch (error) {
-        console.error('Error en Azure Search:', error.response?.data || error.message);
+        console.error('❌ Error en Azure Search:', {
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            data: error.response?.data,
+            url: searchUrl
+        });
+        
+        // Si falla la búsqueda semántica, intentar búsqueda simple
+        if (error.response?.status === 400) {
+            console.log('🔄 Reintentando con búsqueda simple...');
+            try {
+                const simpleResponse = await axios.post(searchUrl, {
+                    search: query,
+                    top: 20,
+                    select: '*',
+                    searchMode: 'any'
+                }, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'api-key': process.env.AZURE_SEARCH_KEY
+                    }
+                });
+                
+                console.log(`📄 Búsqueda simple exitosa: ${simpleResponse.data.value?.length || 0} documentos`);
+                return simpleResponse.data.value || [];
+            } catch (simpleError) {
+                console.error('❌ Error en búsqueda simple:', simpleError.response?.data || simpleError.message);
+                return [];
+            }
+        }
+        
         return [];
     }
 }
 
-// Función para llamar a Azure OpenAI
+// Función mejorada para extraer contexto de documentos
+function extractContext(searchResults) {
+    if (!searchResults || searchResults.length === 0) {
+        return null;
+    }
+    
+    const context = searchResults.map((doc, index) => {
+        let content = '';
+        let title = '';
+        let summary = '';
+        
+        // Intentar diferentes nombres de campos comunes
+        const possibleContentFields = ['content', 'text', 'description', 'body', 'document_content', 'chunk'];
+        const possibleTitleFields = ['title', 'name', 'filename', 'document_title', 'heading'];
+        
+        // Extraer contenido
+        for (const field of possibleContentFields) {
+            if (doc[field]) {
+                content = doc[field];
+                break;
+            }
+        }
+        
+        // Extraer título
+        for (const field of possibleTitleFields) {
+            if (doc[field]) {
+                title = doc[field];
+                break;
+            }
+        }
+        
+        // Extraer resumen de captions si existe
+        if (doc['@search.captions']) {
+            summary = doc['@search.captions'].map(c => c.text).join(' ');
+        } else if (doc['@search.highlights']) {
+            const highlights = Object.values(doc['@search.highlights']).flat();
+            summary = highlights.slice(0, 2).join(' ');
+        }
+        
+        // Si no hay contenido específico, usar todo el documento
+        if (!content && !title) {
+            const docStr = JSON.stringify(doc);
+            content = docStr.length > 500 ? docStr.substring(0, 500) + '...' : docStr;
+            title = `Documento ${index + 1}`;
+        }
+        
+        const docText = [
+            title ? `**Título:** ${title}` : '',
+            content ? `**Contenido:** ${content.substring(0, 800)}${content.length > 800 ? '...' : ''}` : '',
+            summary ? `**Resumen:** ${summary}` : ''
+        ].filter(Boolean).join('\n\n');
+        
+        return docText;
+    }).filter(text => text.length > 0);
+    
+    return context.join('\n\n---\n\n');
+}
+
+// Función mejorada para llamar a Azure OpenAI
 async function getAIResponse(message, context) {
-    const apiUrl = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`;
+    const apiUrl = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-12-01-preview`;
     
-    const systemMessage = `Eres un asistente AI profesional de HAVAS, una de las agencias de publicidad y comunicación más grandes del mundo. 
-    Tu objetivo es ayudar con información precisa y relevante basada en el conocimiento de la empresa.
-    
-    IMPORTANTE: Si tienes contexto relevante, úsalo para responder. Si no hay contexto o no es relevante, indica que no tienes esa información específica en la base de conocimientos.
-    
-    Contexto disponible:
-    ${context || 'No hay contexto específico disponible para esta consulta.'}`;
+    let systemMessage = `Eres un asistente AI profesional de HAVAS, una de las agencias de publicidad y comunicación más grandes del mundo. 
+
+**INSTRUCCIONES IMPORTANTES:**
+- Responde en el idioma que te hable de manera profesional y útil
+- Usa formato Markdown cuando sea apropiado (## títulos, **negrita**, *cursiva*, listas, etc.)
+- Si tienes contexto relevante de documentos, úsalo para dar respuestas precisas
+- Si no tienes información específica sobre lo que se pregunta, indícalo claramente
+- Mantén un tono profesional pero cercano, representando los valores de HAVAS
+
+`;
+
+    if (context && context.trim()) {
+        systemMessage += `**Contexto de documentos encontrados:**\n\n${context}`;
+    } else {
+        systemMessage += `**Nota:** No se encontraron documentos específicos para esta consulta en la base de conocimientos.`;
+    }
     
     try {
+        console.log('🤖 Enviando mensaje a Azure OpenAI...');
+        
         const response = await axios.post(apiUrl, {
             messages: [
                 { role: 'system', content: systemMessage },
                 { role: 'user', content: message }
             ],
-            max_tokens: 1000,
-            temperature: 0.7,
-            top_p: 0.95,
-            frequency_penalty: 0,
-            presence_penalty: 0,
-            stop: null
+            max_completion_tokens: 10000,
+            model: process.env.AZURE_OPENAI_DEPLOYMENT
         }, {
             headers: {
                 'Content-Type': 'application/json',
@@ -115,14 +233,19 @@ async function getAIResponse(message, context) {
             }
         });
         
+        console.log('✅ Respuesta de OpenAI recibida');
         return response.data.choices[0].message.content;
+        
     } catch (error) {
-        console.error('Error en Azure OpenAI:', error.response?.data || error.message);
+        console.error('❌ Error en Azure OpenAI:', {
+            status: error.response?.status,
+            data: error.response?.data || error.message
+        });
         throw error;
     }
 }
 
-// Endpoint principal del chat
+// Endpoint principal del chat mejorado
 app.post('/api/chat', async (req, res) => {
     try {
         const { message } = req.body;
@@ -132,20 +255,20 @@ app.post('/api/chat', async (req, res) => {
         }
         
         console.log('📩 Mensaje recibido:', message);
+        console.log('⏰ Timestamp:', new Date().toISOString());
         
         // Buscar documentos relevantes
         const searchResults = await searchDocuments(message);
-        console.log(`🔍 Se encontraron ${searchResults.length} documentos relevantes`);
+        console.log(`🔍 Resultado de búsqueda: ${searchResults.length} documentos`);
         
-        // Preparar contexto
-        const context = searchResults.map(doc => {
-            // Adaptar según la estructura de tus documentos
-            const content = doc.content || doc.text || doc.description || '';
-            const title = doc.title || doc.name || '';
-            const caption = doc['@search.captions']?.[0]?.text || '';
-            
-            return `Título: ${title}\nContenido: ${content}\nResumen: ${caption}`;
-        }).filter(text => text.length > 0).join('\n\n---\n\n');
+        // Extraer contexto de forma más robusta
+        const context = extractContext(searchResults);
+        
+        if (context) {
+            console.log(`📄 Contexto extraído: ${context.length} caracteres`);
+        } else {
+            console.log('ℹ️ No se encontró contexto relevante');
+        }
         
         // Obtener respuesta de AI
         const aiResponse = await getAIResponse(message, context);
@@ -153,11 +276,13 @@ app.post('/api/chat', async (req, res) => {
         
         res.json({ 
             response: aiResponse,
-            documentsFound: searchResults.length
+            documentsFound: searchResults.length,
+            hasContext: !!context,
+            timestamp: new Date().toISOString()
         });
         
     } catch (error) {
-        console.error('Error en /api/chat:', error);
+        console.error('❌ Error en /api/chat:', error);
         res.status(500).json({ 
             error: 'Error al procesar tu mensaje. Por favor, intenta de nuevo.',
             details: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -165,13 +290,63 @@ app.post('/api/chat', async (req, res) => {
     }
 });
 
-// Endpoint de health check
-app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'production'
-    });
+// Endpoint para debug del índice
+app.get('/api/debug/index', async (req, res) => {
+    try {
+        const indexUrl = `${process.env.AZURE_SEARCH_ENDPOINT}/indexes/${process.env.AZURE_SEARCH_INDEX}?api-version=2023-11-01`;
+        
+        const response = await axios.get(indexUrl, {
+            headers: {
+                'api-key': process.env.AZURE_SEARCH_KEY
+            }
+        });
+        
+        res.json({
+            indexName: process.env.AZURE_SEARCH_INDEX,
+            fields: response.data.fields,
+            totalFields: response.data.fields.length
+        });
+    } catch (error) {
+        res.status(500).json({
+            error: 'Error al obtener información del índice',
+            details: error.response?.data || error.message
+        });
+    }
+});
+
+// Endpoint de health check mejorado
+app.get('/api/health', async (req, res) => {
+    try {
+        // Test Azure OpenAI
+        const openaiTest = await axios.get(`${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments?api-version=2024-12-01-preview`, {
+            headers: {
+                'api-key': process.env.AZURE_OPENAI_KEY
+            }
+        });
+        
+        // Test Azure Search
+        const searchTest = await axios.get(`${process.env.AZURE_SEARCH_ENDPOINT}/indexes/${process.env.AZURE_SEARCH_INDEX}?api-version=2023-11-01`, {
+            headers: {
+                'api-key': process.env.AZURE_SEARCH_KEY
+            }
+        });
+        
+        res.json({ 
+            status: 'healthy',
+            timestamp: new Date().toISOString(),
+            environment: process.env.NODE_ENV || 'production',
+            services: {
+                openai: 'connected',
+                search: 'connected'
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: 'unhealthy',
+            timestamp: new Date().toISOString(),
+            error: error.message
+        });
+    }
 });
 
 // Servir la aplicación
@@ -183,4 +358,5 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 HAVAS Chatbot corriendo en http://localhost:${PORT}`);
     console.log('📊 Environment:', process.env.NODE_ENV || 'production');
+    console.log('🔧 Debug endpoint disponible en: http://localhost:${PORT}/api/debug/index');
 });
