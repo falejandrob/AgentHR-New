@@ -314,30 +314,37 @@ app.get('/api/debug/index', async (req, res) => {
     }
 });
 
-// Endpoint de health check mejorado
+// Endpoint de health check simplificado
 app.get('/api/health', async (req, res) => {
     try {
-        // Test Azure OpenAI
-        const openaiTest = await axios.get(`${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments?api-version=2024-12-01-preview`, {
-            headers: {
-                'api-key': process.env.AZURE_OPENAI_KEY
-            }
-        });
+        // Verificar solo que las variables de entorno estén configuradas
+        const requiredVars = [
+            'AZURE_OPENAI_ENDPOINT',
+            'AZURE_OPENAI_KEY',
+            'AZURE_OPENAI_DEPLOYMENT',
+            'AZURE_SEARCH_ENDPOINT',
+            'AZURE_SEARCH_KEY',
+            'AZURE_SEARCH_INDEX'
+        ];
         
-        // Test Azure Search
-        const searchTest = await axios.get(`${process.env.AZURE_SEARCH_ENDPOINT}/indexes/${process.env.AZURE_SEARCH_INDEX}?api-version=2023-11-01`, {
-            headers: {
-                'api-key': process.env.AZURE_SEARCH_KEY
-            }
-        });
+        const missing = requiredVars.filter(key => !process.env[key]);
         
+        if (missing.length > 0) {
+            return res.status(500).json({
+                status: 'unhealthy',
+                timestamp: new Date().toISOString(),
+                error: `Missing environment variables: ${missing.join(', ')}`
+            });
+        }
+        
+        // Health check básico - solo verificar que el servidor esté funcionando
         res.json({ 
             status: 'healthy',
             timestamp: new Date().toISOString(),
             environment: process.env.NODE_ENV || 'production',
             services: {
-                openai: 'connected',
-                search: 'connected'
+                server: 'running',
+                config: 'loaded'
             }
         });
     } catch (error) {
