@@ -277,34 +277,41 @@ class HavasChat {
         }
     }
     
-    // Simple table enhancement - clean and functional
+    // Adaptive table enhancement similar to ChatGPT
     enhanceTablesInMessage(messageDiv) {
         const tables = messageDiv.querySelectorAll('table');
-        
+
         tables.forEach(table => {
-            // Remove any existing wrappers to start clean
-            if (table.parentElement.classList.contains('table-scroll-container')) {
-                const wrapper = table.parentElement;
-                wrapper.parentNode.insertBefore(table, wrapper);
-                wrapper.remove();
+            // Remove inline styles from previous passes
+            table.removeAttribute('style');
+
+            // Count rows for compact class
+            const bodyRows = table.querySelectorAll('tbody tr').length || table.querySelectorAll('tr').length;
+            if (bodyRows > 0 && bodyRows <= 4) {
+                table.classList.add('compact');
             }
-            
-            // Simple scroll setup - no complex wrappers
-            table.style.display = 'block';
-            table.style.overflow = 'auto';
-            table.style.maxHeight = '400px';
-            table.style.width = '100%';
-            table.style.border = '1px solid #e8eaed';
-            table.style.borderRadius = 'var(--radius-md)';
-            table.style.background = 'white';
-            
-            // Make headers sticky
-            const headerCells = table.querySelectorAll('thead th');
-            headerCells.forEach(th => {
-                th.style.position = 'sticky';
-                th.style.top = '0';
-                th.style.zIndex = '1';
-                th.style.background = 'var(--gradient-primary)';
+
+            // Wrap table only if scrollable (defer until next frame to ensure dimensions)
+            requestAnimationFrame(() => {
+                const needsHorizontal = table.scrollWidth > table.clientWidth;
+                const needsVertical = table.scrollHeight > 400; // threshold like CSS max-height
+
+                const alreadyWrapped = table.parentElement.classList.contains('table-wrapper');
+                if (!alreadyWrapped && (needsHorizontal || needsVertical)) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'table-wrapper scrollable';
+                    table.parentNode.insertBefore(wrapper, table);
+                    wrapper.appendChild(table);
+                } else if (!alreadyWrapped) {
+                    // Still wrap for consistent radius/shadow, but without scroll class
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'table-wrapper';
+                    table.parentNode.insertBefore(wrapper, table);
+                    wrapper.appendChild(table);
+                } else if (alreadyWrapped) {
+                    // Toggle scrollable class depending on need
+                    table.parentElement.classList.toggle('scrollable', (needsHorizontal || needsVertical));
+                }
             });
         });
     }
