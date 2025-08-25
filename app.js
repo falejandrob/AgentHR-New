@@ -224,7 +224,7 @@ async function getAIResponse(message, context) {
                 { role: 'system', content: systemMessage },
                 { role: 'user', content: message }
             ],
-            max_completion_tokens: 5000,
+            max_completion_tokens: 10000,
             model: process.env.AZURE_OPENAI_DEPLOYMENT
         }, {
             headers: {
