@@ -138,10 +138,7 @@ class HavasChat {
                         
                         const lastMessage = this.messagesArea.lastElementChild;
                         if (lastMessage && lastMessage.classList.contains('assistant')) {
-                            const messageContent = lastMessage.querySelector('.message-content');
-                            if (messageContent) {
-                                messageContent.appendChild(contextIndicator);
-                            }
+                            lastMessage.appendChild(contextIndicator);
                         }
                     }
                     
@@ -231,8 +228,6 @@ class HavasChat {
         
         if (useMarkdown && sender === 'assistant') {
             contentDiv.innerHTML = this.renderMarkdown(text);
-            // Enhance tables after rendering
-            this.enhanceTablesInMessage(contentDiv);
         } else {
             contentDiv.textContent = text;
         }
@@ -278,45 +273,6 @@ class HavasChat {
         } catch (error) {
             console.error('Error getting index debug info:', error);
         }
-    }
-    
-    // Adaptive table enhancement similar to ChatGPT
-    enhanceTablesInMessage(messageDiv) {
-        const tables = messageDiv.querySelectorAll('table');
-
-        tables.forEach(table => {
-            // Remove inline styles from previous passes
-            table.removeAttribute('style');
-
-            // Count rows for compact class
-            const bodyRows = table.querySelectorAll('tbody tr').length || table.querySelectorAll('tr').length;
-            if (bodyRows > 0 && bodyRows <= 4) {
-                table.classList.add('compact');
-            }
-
-            // Wrap table only if scrollable (defer until next frame to ensure dimensions)
-            requestAnimationFrame(() => {
-                const needsHorizontal = table.scrollWidth > table.clientWidth;
-                const needsVertical = table.scrollHeight > 400; // threshold like CSS max-height
-
-                const alreadyWrapped = table.parentElement.classList.contains('table-wrapper');
-                if (!alreadyWrapped && (needsHorizontal || needsVertical)) {
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'table-wrapper scrollable';
-                    table.parentNode.insertBefore(wrapper, table);
-                    wrapper.appendChild(table);
-                } else if (!alreadyWrapped) {
-                    // Still wrap for consistent radius/shadow, but without scroll class
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'table-wrapper';
-                    table.parentNode.insertBefore(wrapper, table);
-                    wrapper.appendChild(table);
-                } else if (alreadyWrapped) {
-                    // Toggle scrollable class depending on need
-                    table.parentElement.classList.toggle('scrollable', (needsHorizontal || needsVertical));
-                }
-            });
-        });
     }
 }
 
