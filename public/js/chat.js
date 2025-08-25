@@ -138,7 +138,10 @@ class HavasChat {
                         
                         const lastMessage = this.messagesArea.lastElementChild;
                         if (lastMessage && lastMessage.classList.contains('assistant')) {
-                            lastMessage.appendChild(contextIndicator);
+                            const messageContent = lastMessage.querySelector('.message-content');
+                            if (messageContent) {
+                                messageContent.appendChild(contextIndicator);
+                            }
                         }
                     }
                     
