@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HAVAS AI Assistant - Powered by Azure</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <!-- Animated background -->
+    <div class="bg-animation">
+        <div class="gradient-sphere sphere-1"></div>
+        <div class="gradient-sphere sphere-2"></div>
+        <div class="gradient-sphere sphere-3"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo-section">
+                <h1 class="logo">HAVAS</h1>
+                <span class="tagline">AI Knowledge Assistant</span>
+            </div>
+            <div class="status-badge">
+                <span class="status-dot"></span>
+                <span id="statusText">Azure AI Connected</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Chat Interface -->
+    <main class="main-container">
+        <div class="chat-wrapper">
+            <div class="chat-header">
+                <div class="chat-header-info">
+                    <div class="ai-avatar">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2"/>
+                            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2"/>
+                            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2>HAVAS Assistant</h2>
+                        <p>Powered by Azure AI Foundry & AI Search</p>
+                    </div>
+                </div>
+                <div class="documents-counter" id="docsCounter" style="display: none;">
+                    <span id="docsCount">0</span> docs
+                </div>
+            </div>
+
+            <div class="messages-area" id="messagesArea">
+                <div class="welcome-message">
+                    <div class="welcome-icon">👋</div>
+                    <h3>¡Bienvenido al Asistente HAVAS!</h3>
+                    <p>Estoy aquí para ayudarte con cualquier consulta sobre nuestra base de conocimientos. ¿En qué puedo asistirte hoy?</p>
+                </div>
+            </div>
+
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-bubble">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>
+
+            <div class="input-section">
+                <div class="input-container">
+                    <input 
+                        type="text" 
+                        id="messageInput" 
+                        placeholder="Escribe tu pregunta aquí..."
+                        aria-label="Message input"
+                    >
+                    <button id="sendButton" aria-label="Send message">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M2 10L17 2L13 18L11 11L2 10Z" fill="currentColor"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="input-hint">Presiona Enter para enviar</div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/chat.js"></script>
+</body>
+</html>
