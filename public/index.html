@@ -31,25 +31,6 @@
     <!-- Main Chat Interface -->
     <main class="main-container">
         <div class="chat-wrapper">
-            <div class="chat-header">
-                <div class="chat-header-info">
-                    <div class="ai-avatar">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2"/>
-                            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2"/>
-                            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <h2>HAVAS Assistant</h2>
-                        <p>Powered by Azure AI Foundry & AI Search</p>
-                    </div>
-                </div>
-                <div class="documents-counter" id="docsCounter" style="display: none;">
-                    <span id="docsCount">0</span> docs
-                </div>
-            </div>
-
             <div class="messages-area" id="messagesArea">
                 <div class="welcome-message">
                     <div class="welcome-icon">👋</div>
@@ -66,21 +47,42 @@
                 </div>
             </div>
 
-            <div class="input-section">
-                <div class="input-container">
-                    <input 
-                        type="text" 
-                        id="messageInput" 
-                        placeholder="Écrivez votre question ici..."
-                        aria-label="Message input"
-                    >
-                    <button id="sendButton" aria-label="Send message">
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                            <path d="M2 10L17 2L13 18L11 11L2 10Z" fill="currentColor"/>
-                        </svg>
-                    </button>
+            <div id="inputSection" class="input-section centered">
+                <div class="input-wrapper">
+                    <div class="chatgpt-input-container">
+                        <!-- Menu Button -->
+                        <button id="menuButton" class="menu-btn" aria-label="Menu">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 5v14M5 12h14"/>
+                            </svg>
+                        </button>
+                        
+                        <!-- Dropdown Menu -->
+                        <div id="dropdownMenu" class="dropdown-menu">
+                            <div class="dropdown-item" id="newChatOption">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                </svg>
+                                <span>Nuevo chat</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Input Field -->
+                        <div class="input-field-container">
+                            <textarea 
+                                id="messageInput" 
+                                placeholder="Mensaje a HAVAS Assistant..."
+                                aria-label="Message input"
+                                rows="1"
+                            ></textarea>
+                            <button id="sendButton" class="send-btn" aria-label="Send message" disabled>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="input-hint">Appuyez sur Entrée pour envoyer</div>
             </div>
         </div>
     </main>
