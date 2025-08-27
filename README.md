@@ -1,405 +1,322 @@
-# HAVAS Chatbot - Azure Web App
+# 🏢 HAVAS Chatbot - Versión Python
 
-## 🚀 Descripción
-Aplicación de chatbot empresarial para HAVAS que integra Azure OpenAI y Azure AI Search para proporcionar respuestas basadas en RAG (Retrieval-Augmented Generation).
+Asistente de IA inteligente para HAVAS, integrado con Azure OpenAI y Azure AI Search.
 
-## 📋 Prerrequisitos
+## 🚀 Características Principales
 
-### Recursos de Azure necesarios:
-1. **Azure OpenAI Service**
-   - Un deployment de GPT-4 o GPT-3.5
-   - Endpoint y API Key
+- **🤖 IA Conversacional**: Azure OpenAI (GPT-4.1-mini) para respuestas naturales
+- **🔍 Búsqueda Vectorial**: Azure AI Search con embeddings (text-embedding-3-small)
+- **🌍 Multiidioma**: Responde automáticamente en el idioma de la pregunta (español, francés, inglés)
+- **⚡ Búsqueda Inteligente**: Vector search con fallback a búsqueda local (FAISS)
+- **� Memoria Conversacional**: Mantiene contexto de conversaciones por sesión
+- **🖥️ Interfaz Web**: Frontend moderno con soporte Markdown y tiempo real
+- **🔒 Rate Limiting**: Protección contra abuso (30 requests/min)
+- **📊 Diagnóstico**: Sistema completo de monitoreo y health checks
 
-2. **Azure AI Search**
-   - Un índice configurado con tus documentos
-   - Endpoint y API Key
-   - Configuración semántica (opcional pero recomendada)
+## 🛠️ Instalación y Configuración
 
-3. **Azure App Service** (para deployment)
-   - Plan de App Service (B1 o superior recomendado)
+### Prerrequisitos
+- Python 3.9+ 
+- Azure OpenAI Service
+- Azure AI Search Service
 
-## 🛠️ Instalación Local
-
-### 1. Crear la estructura del proyecto:
-
+### 1. Clonar el repositorio
 ```bash
-# Crear carpeta principal
-mkdir havas-chatbot
-cd havas-chatbot
-
-# Crear estructura de carpetas
-mkdir -p public/css public/js
+git clone [repository-url]
+cd AgenteHR-v2
 ```
 
-### 2. Crear los archivos:
-
-Copia cada archivo de los artifacts anteriores en su ubicación correspondiente:
-- `package.json` en la raíz
-- `app.js` en la raíz
-- `.env.example` en la raíz
-- `index.html` en `public/`
-- `styles.css` en `public/css/`
-- `chat.js` en `public/js/`
-
-### 3. Instalar dependencias:
-
+### 2. Instalar dependencias
 ```bash
-npm install
+pip install -r requirements.txt
 ```
 
-### 4. Configurar variables de entorno:
+### 3. Configurar variables de entorno
+Crear archivo `.env` con:
+```env
+# Azure OpenAI Principal (para respuestas del chat)
+AZURE_OPENAI_ENDPOINT=https://your-openai-resource.openai.azure.com/
+AZURE_OPENAI_KEY=your-openai-key
+AZURE_OPENAI_DEPLOYMENT=your-deployment-name
 
+# Azure OpenAI para Traducciones (GPT-4.1 nano)
+AZURE_OPENAI_TRANSLATION_ENDPOINT=https://your-translation-resource.cognitiveservices.azure.com/
+AZURE_OPENAI_TRANSLATION_KEY=your-translation-api-key
+AZURE_OPENAI_TRANSLATION_DEPLOYMENT=gpt-4.1-nano
+AZURE_OPENAI_TRANSLATION_API_VERSION=2025-01-01-preview
+
+# Azure AI Search (fuente primaria de conocimiento)
+AZURE_SEARCH_ENDPOINT=https://your-search-service.search.windows.net
+AZURE_SEARCH_KEY=your-search-key
+AZURE_SEARCH_INDEX=your-index-name
+# (Opcional) Config semántica y modo only
+# AZURE_SEARCH_SEMANTIC_CONFIG=default
+# AZURE_SEARCH_ONLY=true
+
+# Configuración de la aplicación
+PORT=3000
+FLASK_ENV=development
+```
+### 4. Ejecutar la aplicación
 ```bash
-# Copiar el archivo de ejemplo
-cp .env.example .env
-
-# Editar .env con tus credenciales reales
-# Usar tu editor favorito (nano, vim, code, etc.)
-nano .env
+python app_langchain.py
 ```
 
-### 5. Ejecutar en modo desarrollo:
+## � Estructura del Proyecto
 
-```bash
-npm run dev
+```
+AgenteHR-v2/
+├── app_langchain.py          # 🚀 Aplicación principal Flask
+├── .env                      # 🔧 Variables de entorno (configurar)
+├── .env.example             # 📋 Plantilla de configuración
+├── requirements.txt         # 📦 Dependencias Python
+├── README.md               # 📖 Documentación
+├── 
+├── agents/                 # 🤖 Agentes IA
+│   └── hr_agent.py        # Agente principal HR con LangChain
+├── 
+├── config/                 # ⚙️ Configuraciones
+│   └── langchain_config.py # Configuración LangChain, prompts y LLM
+├── 
+├── tools/                  # 🔧 Herramientas de búsqueda
+│   ├── azure_search.py    # Azure AI Search con vector search
+│   ├── vector_search.py   # Búsqueda vectorial local (FAISS)
+│   └── document_search.py # Utilidades de documentos
+├── 
+├── memory/                 # 💾 Sistema de memoria
+│   └── conversation_memory.py # Memoria conversacional por sesión
+├── 
+├── public/                 # 🌐 Frontend web
+│   ├── index.html         # Interfaz principal
+│   ├── css/styles.css     # Estilos
+│   └── js/chat.js         # JavaScript del chat
+├── 
+├── tests/                  # 🧪 Pruebas y diagnósticos
+│   ├── test_chat.py       # Test de chat completo
+│   ├── test_vector_search.py # Test búsqueda vectorial
+│   └── diagnostic.py      # Diagnóstico de servicios
+├── 
+├── alternatives/           # 🗂️ Versiones alternativas
+│   ├── app.py            # Versión legacy Flask
+│   ├── main.py           # Punto entrada alternativo
+│   └── start.py          # Script de inicio alternativo
+└── 
+└── data/                   # 📊 Datos y vectorstore local
+    └── vectorstore/       # Base de datos vectorial FAISS
 ```
 
-La aplicación estará disponible en http://localhost:3000
+## 🚀 Uso
 
-## 🚀 Despliegue en Azure App Service
-
-### Opción 1: Usando Azure CLI
-
-#### Instalar Azure CLI (si no lo tienes):
-
+### Iniciar el Servidor
 ```bash
-# Windows
-winget install Microsoft.AzureCLI
-
-# macOS
-brew install azure-cli
-
-# Linux
-curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+python app_langchain.py
 ```
 
-#### Desplegar la aplicación:
+La aplicación estará disponible en: `http://localhost:3000`
 
-```bash
-# 1. Login en Azure
-az login
+### Endpoints Disponibles
 
-# 2. Definir variables
-RESOURCE_GROUP="rg-havas-chatbot"
-APP_NAME="havas-chatbot-$(date +%s)"  # Nombre único
-LOCATION="westeurope"
+- **Chat**: `POST /api/chat` - Endpoint principal de conversación
+- **Health**: `GET /api/health` - Health check del sistema
+- **Debug**: `GET /api/debug/sessions` - Información de sesiones activas
 
-# 3. Crear grupo de recursos
-az group create --name $RESOURCE_GROUP --location $LOCATION
+# Diagnóstico
+python diagnostic.py
 
-# 4. Crear App Service Plan
-az appservice plan create \
-  --name "$APP_NAME-plan" \
-  --resource-group $RESOURCE_GROUP \
-  --sku B1 \
-  --is-linux
-
-# 5. Crear Web App
-az webapp create \
-  --resource-group $RESOURCE_GROUP \
-  --plan "$APP_NAME-plan" \
-  --name $APP_NAME \
-  --runtime "node|18-lts"
-
-# 6. Configurar variables de entorno
-az webapp config appsettings set \
-  --resource-group $RESOURCE_GROUP \
-  --name $APP_NAME \
-  --settings \
-    AZURE_OPENAI_ENDPOINT="tu-endpoint-aqui" \
-    AZURE_OPENAI_KEY="tu-key-aqui" \
-    AZURE_OPENAI_DEPLOYMENT="tu-deployment-aqui" \
-    AZURE_SEARCH_ENDPOINT="tu-search-endpoint-aqui" \
-    AZURE_SEARCH_KEY="tu-search-key-aqui" \
-    AZURE_SEARCH_INDEX="tu-index-aqui"
-
-# 7. Crear archivo ZIP para deployment
-zip -r deploy.zip . -x "*.git*" -x "*.env" -x "node_modules/*"
-
-# 8. Desplegar el ZIP
-az webapp deployment source config-zip \
-  --resource-group $RESOURCE_GROUP \
-  --name $APP_NAME \
-  --src deploy.zip
-
-# 9. Ver la URL de tu app
-echo "Tu app está en: https://$APP_NAME.azurewebsites.net"
+# Script de inicio
+python start.py
 ```
 
-### Opción 2: Usando Azure Portal
+### Opción 3: Usando el batch file (Windows)
+```cmd
+# Simplifica el comando en Windows
+python.bat main.py help
+python.bat app.py
+```
 
-1. **Crear App Service:**
-   - Ir a [Azure Portal](https://portal.azure.com)
-   - Click en "Crear un recurso"
-   - Buscar "Web App"
-   - Configurar:
-     - **Suscripción**: Tu suscripción
-     - **Grupo de recursos**: Crear nuevo o usar existente
-     - **Nombre**: Un nombre único para tu app
-     - **Publicar**: Código
-     - **Pila del runtime**: Node 18 LTS
-     - **Sistema operativo**: Linux
-     - **Región**: La más cercana a tus usuarios
-     - **Plan**: B1 o superior
+## 🌐 Endpoints API
 
-2. **Configurar variables de entorno:**
-   - Ir a tu App Service
-   - En el menú lateral: Configuración → Configuración de la aplicación
-   - Agregar nueva configuración de aplicación para cada variable:
-     - AZURE_OPENAI_ENDPOINT
-     - AZURE_OPENAI_KEY
-     - AZURE_OPENAI_DEPLOYMENT
-     - AZURE_SEARCH_ENDPOINT
-     - AZURE_SEARCH_KEY
-     - AZURE_SEARCH_INDEX
-   - Guardar cambios
+| Endpoint | Método | Descripción |
+|----------|--------|-------------|
+| `/` | GET | Página principal del chatbot |
+| `/api/chat` | POST | Enviar mensaje al chatbot (con traducción automática) |
+| `/api/health` | GET | Estado de salud del sistema |
+| `/api/debug/index` | GET | Información del índice de búsqueda |
+| `/api/debug/translate` | POST | Test de traducción manual |
 
-3. **Desplegar el código:**
-   - En el menú lateral: Centro de implementación
-   - Elegir origen: Git local
-   - Seguir las instrucciones para configurar Git
-   - O usar GitHub Actions si tu código está en GitHub
+### 🌐 Sistema de Traducción Automática
 
-### Opción 3: Usando VS Code
+El chatbot ahora incluye **traducción automática inteligente**:
 
-1. **Instalar extensión:**
-   - Abrir VS Code
-   - Instalar la extensión "Azure App Service"
+1. **Detección automática** del idioma del mensaje
+2. **Traducción a francés** para el procesamiento interno
+3. **Búsqueda en francés** en la base de conocimientos
+4. **Respuesta en francés** generada por la IA
+5. **Traducción de vuelta** al idioma original del usuario
 
-2. **Desplegar:**
-   - Abrir la carpeta del proyecto en VS Code
-   - Click en el icono de Azure en la barra lateral
-   - Sign in a tu cuenta de Azure
-   - Click derecho en "App Services"
-   - "Create New Web App" o "Deploy to Web App"
-   - Seguir el asistente
+#### Idiomas Soportados
+- 🇪🇸 Español
+- 🇬🇧 Inglés  
+- 🇫🇷 Francés (idioma base)
+- 🇩🇪 Alemán
+- 🇮🇹 Italiano
+- 🇵🇹 Portugués
+- Y muchos más...
 
-## 🔧 Configuración de Azure AI Search
+### Ejemplo de uso de API
+```bash
+# Mensaje en español
+curl -X POST http://localhost:3000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "¿Qué servicios ofrece HAVAS?"}'
 
-### Estructura recomendada del índice:
+# Test de traducción manual
+curl -X POST http://localhost:3000/api/debug/translate \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello, how are you?", "target": "es"}'
+```
 
-Tu índice debe tener estos campos (ajusta según tus documentos):
-
+#### Respuesta con información de traducción
 ```json
 {
-  "fields": [
-    {
-      "name": "id",
-      "type": "Edm.String",
-      "key": true
-    },
-    {
-      "name": "content",
-      "type": "Edm.String",
-      "searchable": true
-    },
-    {
-      "name": "title",
-      "type": "Edm.String",
-      "searchable": true
-    },
-    {
-      "name": "description",
-      "type": "Edm.String",
-      "searchable": true
-    }
-  ]
-}
-```
-
-### Configuración semántica (opcional pero recomendada):
-
-```json
-{
-  "name": "default",
-  "prioritizedFields": {
-    "titleField": {
-      "fieldName": "title"
-    },
-    "prioritizedContentFields": [
-      {
-        "fieldName": "content"
-      }
-    ],
-    "prioritizedKeywordsFields": [
-      {
-        "fieldName": "description"
-      }
-    ]
+  "response": "HAVAS ofrece servicios de...",
+  "documentsFound": 5,
+  "hasContext": true,
+  "timestamp": "2025-08-26T14:30:00.000Z",
+  "language": {
+    "detected": "es",
+    "original_message": "¿Qué servicios ofrece HAVAS?",
+    "french_message": "Quels services HAVAS offre-t-il ?",
+    "french_response": "HAVAS offre des services de...",
+    "translated_back": true
   }
 }
 ```
 
-## 📊 Monitoreo y Logs
+## 🔧 Diagnóstico
 
-### Ver logs en tiempo real:
+El sistema incluye un diagnóstico completo que verifica:
 
-```bash
-az webapp log tail \
-  --resource-group $RESOURCE_GROUP \
-  --name $APP_NAME
-```
-
-### Habilitar Application Insights (recomendado):
+1. ✅ Variables de entorno
+2. 🔍 Conectividad con Azure AI Search
+3. 📄 Estructura del índice de búsqueda
+4. 🤖 Conexión con Azure OpenAI
+5. 🎯 Test de integración completa
 
 ```bash
-# Crear Application Insights
-az monitor app-insights component create \
-  --app "ai-$APP_NAME" \
-  --location $LOCATION \
-  --resource-group $RESOURCE_GROUP
-
-# Conectar con tu App Service
-az webapp config appsettings set \
-  --resource-group $RESOURCE_GROUP \
-  --name $APP_NAME \
-  --settings APPLICATIONINSIGHTS_CONNECTION_STRING=<connection-string>
+python main.py diagnostic
 ```
+
+## 📁 Estructura del Proyecto (Final)
+
+```
+├── app.py                    # 🐍 Servidor Flask principal con traducción automática
+├── diagnostic.py             # 🔍 Script de diagnóstico completo  
+├── main.py                  # 🎛️ CLI unificado y punto de entrada
+├── start.py                 # 🚀 Script de inicio alternativo
+├── requirements.txt         # 📋 Dependencias Python
+├── .env                     # 🔐 Variables de entorno (configuración)
+├── .env.example             # 📝 Ejemplo de configuración
+├── python.bat              # 🛠️ Helper para Windows (opcional)
+├── public/                 # 🌐 Frontend (sin cambios de la versión Node.js)
+│   ├── index.html          #   📄 Página principal del chat
+│   ├── css/styles.css      #   🎨 Estilos CSS
+│   └── js/chat.js          #   ⚙️ Lógica del chat (JavaScript)
+├── backup/                 # 📦 Versión original Node.js (respaldo)
+│   ├── app.js              #   🟨 Servidor Express original  
+│   ├── diagnostic.js       #   🔍 Diagnóstico JavaScript original
+│   ├── package.json        #   📋 Dependencias Node.js
+│   ├── node_modules/       #   📚 Módulos de Node.js
+│   └── README-BACKUP.md    #   📖 Documentación del backup
+├── MIGRATION_SUMMARY.md    # 📋 Resumen detallado de la migración
+└── README.md               # 📖 Esta documentación
+```
+
+## 🔄 Migración desde Node.js
+
+Este proyecto fue migrado completamente desde Node.js/Express a Python/Flask. Detalles completos en [MIGRATION_SUMMARY.md](MIGRATION_SUMMARY.md).
+
+### Equivalencias
+- `app.js` → `app.py` (Flask server)
+- `diagnostic.js` → `diagnostic.py` 
+- `package.json` → `requirements.txt`
+- Express → Flask
+- axios → requests
+- express-rate-limit → flask-limiter
+
+## 🐞 Resolución de Problemas
+
+### Error: Module 'flask' not found
+```bash
+pip install -r requirements.txt
+```
+
+### Error: Python command not found
+Usar el comando específico de tu instalación Python o el archivo `python.bat` incluido.
+
+### Error: Azure API version
+Asegúrate de usar la versión correcta de API en las llamadas a Azure OpenAI (2024-12-01-preview).
+
+### Puertos en uso
+Por defecto usa puerto 3000. Cambiar con variable de entorno `PORT=5000`.
+
+## 📊 Logging
+
+El sistema incluye logging detallado:
+- 📩 Mensajes recibidos
+- 🔍 Resultados de búsqueda  
+- 🤖 Respuestas de IA
+- ❌ Errores y diagnósticos
 
 ## 🔒 Seguridad
 
-### Configuraciones implementadas:
-- ✅ Rate limiting (30 requests/minuto)
-- ✅ Helmet.js para headers de seguridad
-- ✅ CORS configurado
-- ✅ Variables de entorno para secretos
-- ✅ No exposición de credenciales al frontend
+- Rate limiting: 30 requests/minuto por IP
+- CORS configurado
+- Validación de entrada
+- Variables de entorno para credenciales
+- Error handling robusto
 
-### Configuraciones adicionales recomendadas:
+## 🌟 Características de la Versión Python
 
+### Mejoras sobre Node.js
+- ✅ CLI más intuitivo
+- ✅ Mejor manejo de errores
+- ✅ Logging más detallado
+- ✅ Código más modular
+- ✅ Diagnóstico más completo
+
+### Mantenido Compatible
+- ✅ Mismo frontend JavaScript
+- ✅ Mismas rutas API
+- ✅ Mismo formato de respuestas
+- ✅ Misma configuración
+
+## 📝 Licencia
+
+Proyecto interno de HAVAS.
+
+## 🤝 Soporte
+
+Para problemas o preguntas, ejecutar diagnóstico y revisar logs:
 ```bash
-# Habilitar HTTPS only
-az webapp update \
-  --resource-group $RESOURCE_GROUP \
-  --name $APP_NAME \
-  --https-only true
-
-# Configurar dominio personalizado (opcional)
-az webapp config hostname add \
-  --webapp-name $APP_NAME \
-  --resource-group $RESOURCE_GROUP \
-  --hostname www.tu-dominio.com
+python main.py diagnostic
 ```
-
-## 🧪 Testing
-
-### Probar localmente:
-
-```bash
-# Health check
-curl http://localhost:3000/api/health
-
-# Enviar mensaje de prueba
-curl -X POST http://localhost:3000/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Hola, ¿cómo estás?"}'
-```
-
-### Probar en Azure:
-
-```bash
-# Reemplazar con tu URL
-APP_URL="https://tu-app.azurewebsites.net"
-
-# Health check
-curl $APP_URL/api/health
-
-# Test chat
-curl -X POST $APP_URL/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Test message"}'
-```
-
-## 📈 Escalamiento
-
-### Escalar verticalmente:
-
-```bash
-az appservice plan update \
-  --name "$APP_NAME-plan" \
-  --resource-group $RESOURCE_GROUP \
-  --sku P1V2
-```
-
-### Configurar auto-scaling:
-
-```bash
-az monitor autoscale create \
-  --resource-group $RESOURCE_GROUP \
-  --resource "$APP_NAME-plan" \
-  --resource-type Microsoft.Web/serverfarms \
-  --name autoscale-$APP_NAME \
-  --min-count 1 \
-  --max-count 5 \
-  --count 1
-
-az monitor autoscale rule create \
-  --resource-group $RESOURCE_GROUP \
-  --autoscale-name autoscale-$APP_NAME \
-  --condition "CpuPercentage > 70 avg 5m" \
-  --scale out 1
-```
-
-## 🐛 Solución de Problemas
-
-### La app no se conecta a Azure OpenAI:
-- Verificar que el endpoint incluye el `/` al final
-- Confirmar que la API key es correcta
-- Verificar que el deployment name existe
-
-### No encuentra documentos:
-- Verificar el nombre del índice
-- Confirmar que hay documentos indexados
-- Revisar los campos del índice
-
-### Error 500:
-```bash
-# Ver logs detallados
-az webapp log tail \
-  --resource-group $RESOURCE_GROUP \
-  --name $APP_NAME
-
-# Verificar configuración
-az webapp config appsettings list \
-  --resource-group $RESOURCE_GROUP \
-  --name $APP_NAME
-```
-
-## 📝 Estructura del Proyecto
-
-```
-havas-chatbot/
-├── package.json          # Dependencias de Node.js
-├── app.js               # Servidor Express principal
-├── .env                 # Variables de entorno (no subir a Git)
-├── .env.example         # Plantilla de variables
-├── public/              # Archivos estáticos
-│   ├── index.html       # Interfaz principal
-│   ├── css/
-│   │   └── styles.css   # Estilos
-│   └── js/
-│       └── chat.js      # Lógica del cliente
-└── README.md            # Este archivo
-```
-
-## 🆘 Soporte
-
-Para soporte interno, contactar al equipo de IT de HAVAS.
-
-## 📄 Licencia
-
-Proprietary - HAVAS Group
 
 ---
 
-**Desarrollado con ❤️ por el equipo de innovación de HAVAS**
+**🎉 Estado: ✅ MIGRACIÓN COMPLETA Y FUNCIONAL**  
+**🌐 Nueva funcionalidad: Sistema de traducción automática con GPT-4.1 nano**  
+**🔍 Nueva: Integración Azure AI Search como recuperador primario (variable AZURE_SEARCH_ONLY)**
+**🐍 Versión: Python 3.10+ / Flask 3.0**  
+**📅 Finalizado: Agosto 2025**
+
+### 🏆 Logros de esta migración:
+- ✅ Migración completa de Node.js/Express a Python/Flask
+- ✅ Sistema de traducción automática multiidioma implementado
+- ✅ Detección automática de idioma con GPT-4.1 nano
+- ✅ Procesamiento interno en francés, respuesta en idioma original
+- ✅ Frontend JavaScript preservado sin cambios
+- ✅ Todas las funcionalidades originales mantenidas
+- ✅ Documentación completa y actualizada
+- ✅ Scripts de diagnóstico y prueba incluidos
+- ✅ Backup completo de la versión original Node.js
