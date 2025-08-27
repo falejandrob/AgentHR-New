@@ -39,7 +39,7 @@ class AzureSearchClient:
         self.only_mode = os.getenv("AZURE_SEARCH_ONLY", "false").lower() == "true"
         self.vector_mode = os.getenv("AZURE_SEARCH_VECTOR", "false").lower() == "true"
         self.vector_field = os.getenv("AZURE_SEARCH_VECTOR_FIELD", "content_embedding")
-        self.vector_k = int(os.getenv("AZURE_SEARCH_VECTOR_K", "5"))
+        self.vector_k = int(os.getenv("AZURE_SEARCH_VECTOR_K", "15"))
         self.enabled = all([self.endpoint, self.key, self.index])
         self.embeddings = None
         if self.enabled:
@@ -73,9 +73,15 @@ class AzureSearchClient:
             logger.error(f"❌ Error generating query embedding: {e}")
             return None
 
-    def search(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
+    def search(self, query: str, k: int = None) -> List[Dict[str, Any]]:
+        """Search for documents using vector or text search"""
         if not self.enabled:
             return []
+        
+        # Use environment variable or default
+        if k is None:
+            k = int(os.getenv("SEARCH_RESULTS_COUNT", "15"))
+            
         search_url = f"{self.endpoint}/indexes/{self.index}/docs/search?api-version={self.api_version}"
         payload: Dict[str, Any]
         if self.vector_mode:

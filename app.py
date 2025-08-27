@@ -1,289 +1,201 @@
 """
-HAVAS Chatbot with LangChain - Enhanced Flask Application
-Integrates vector search, conversation memory and intelligent processing
+HAVAS Chatbot - Aplicación Flask Simplificada
+Optimizada para o3-mini reasoning model
 """
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 import os
 import logging
 from datetime import datetime
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 
-# Importar componentes de LangChain
-from agents.hr_agent import hr_agent
-from tools.vector_search import document_search
-from memory.conversation_memory import memory_manager
+# Imports locales
+from config.langchain_config import validate_config
+from agents.hr_agent import hr_agent_simple
 
 # Cargar variables de entorno
 load_dotenv()
 
-# Configuración de logging
+# Configurar logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Inicialización de Flask
-app = Flask(__name__)
+# Configurar Flask
+app = Flask(__name__, static_folder='public', static_url_path='')
 CORS(app)
 
 # Rate limiting
 limiter = Limiter(
     key_func=get_remote_address,
     app=app,
-    default_limits=["100 per hour"]
+    default_limits=["100 per hour", "10 per minute"]
 )
 
 @app.route('/')
 def index():
-    """Serve main page"""
-    return send_from_directory('public', 'index.html')
+    """Servir página principal"""
+    return app.send_static_file('index.html')
 
-@app.route('/<path:filename>')
-def static_files(filename):
-    """Serve static files"""
-    return send_from_directory('public', filename)
-
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    """Enhanced health check endpoint"""
+@app.route('/api/health')
+@limiter.exempt
+def health():
+    """Health check endpoint"""
     try:
-        # Check LangChain components
-        health_status = {
+        logger.info("✅ Health check: healthy")
+        return jsonify({
             'status': 'healthy',
             'timestamp': datetime.now().isoformat(),
-            'services': {
-                'langchain_agent': True,
-                'vector_search': document_search.vectorstore is not None,
-                'memory_manager': len(memory_manager.active_memories) >= 0,
-                'azure_openai': bool(os.getenv('AZURE_OPENAI_ENDPOINT')),
-                'embeddings': bool(os.getenv('AZURE_OPENAI_EMBEDDING_DEPLOYMENT'))
-            }
-        }
-        
-        # Check for critical issues
-        critical_issues = []
-        if not os.getenv('AZURE_OPENAI_ENDPOINT'):
-            critical_issues.append('AZURE_OPENAI_ENDPOINT missing')
-        if not os.getenv('AZURE_OPENAI_KEY'):
-            critical_issues.append('AZURE_OPENAI_KEY missing')
-        
-        if critical_issues:
-            health_status['status'] = 'degraded'
-            health_status['issues'] = critical_issues
-        
-        logger.info(f"✅ Health check: {health_status['status']}")
-        return jsonify(health_status)
-        
+            'version': '2.0-simplified'
+        })
     except Exception as e:
         logger.error(f"❌ Health check failed: {e}")
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e),
-            'timestamp': datetime.now().isoformat()
-        }), 500
+        return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
 
 @app.route('/api/chat', methods=['POST'])
 @limiter.limit("30 per minute")
 def chat():
-    """Main chat endpoint with LangChain"""
+    """Endpoint principal de chat"""
     try:
+        # Obtener datos de la petición
         data = request.get_json()
-        message = data.get('message')
-        session_id = data.get('session_id', 'default')
+        
+        if not data or 'message' not in data:
+            return jsonify({'error': 'Mensaje requerido'}), 400
+            
+        message = data.get('message', '').strip()
+        session_id = data.get('sessionId', 'default')
+        
         
         if not message:
-            return jsonify({'error': 'Message is required'}), 400
+            return jsonify({'error': 'Mensaje no puede estar vacío'}), 400
+            
+        logger.info(f"📩 Nuevo mensaje recibido: {message[:50]}...")
+        logger.info(f"🆔 Session ID: {session_id}")
         
-        logger.info(f'📩 New message received: {message[:50]}...')
-        logger.info(f'🆔 Session ID: {session_id}')
         
-        # Process message with LangChain agent
-        result = hr_agent.process_message(message, session_id)
+        # Procesar mensaje con el agente simplificado y modelo especificado
+        result = hr_agent_simple.process_message(message, session_id)
         
+        # Verificar si hubo error
         if 'error' in result:
-            logger.error(f'❌ Error processing message: {result["error"]}')
-            return jsonify(result), 500
+            logger.error(f"❌ Error procesando mensaje: {result.get('details', 'Unknown error')}")
+            return jsonify({
+                'error': 'Error interno del servidor',
+                'timestamp': datetime.now().isoformat()
+            }), 500
         
-        logger.info(f'✅ Response generated successfully')
+        logger.info("✅ Mensaje procesado exitosamente")
         return jsonify(result)
         
-    except Exception as error:
-        logger.error(f'❌ Error in /api/chat: {str(error)}', exc_info=True)
+    except Exception as e:
+        logger.error(f"❌ Error en endpoint de chat: {e}")
         return jsonify({
-            'error': 'Internal server error',
-            'details': str(error),
+            'error': 'Error interno del servidor',
             'timestamp': datetime.now().isoformat()
         }), 500
 
 @app.route('/api/new-conversation', methods=['POST'])
+@limiter.limit("10 per minute")
 def new_conversation():
     """Iniciar nueva conversación"""
     try:
         data = request.get_json() or {}
-        session_id = data.get('session_id', 'default')
+        session_id = data.get('sessionId', 'default')
         
-        hr_agent.start_new_conversation(session_id)
+        hr_agent_simple.start_new_conversation(session_id)
         
         return jsonify({
+            'success': True,
             'message': 'Nueva conversación iniciada',
-            'session_id': session_id,
+            'sessionId': session_id,
             'timestamp': datetime.now().isoformat()
         })
         
     except Exception as e:
-        logger.error(f'❌ Error iniciando nueva conversación: {e}')
-        return jsonify({
-            'error': 'Error iniciando nueva conversación',
-            'details': str(e)
-        }), 500
+        logger.error(f"❌ Error iniciando nueva conversación: {e}")
+        return jsonify({'error': 'Error interno del servidor'}), 500
 
-@app.route('/api/conversation-stats', methods=['GET'])
-def conversation_stats():
-    """Obtener estadísticas de conversación"""
-    try:
-        session_id = request.args.get('session_id', 'default')
-        stats = hr_agent.get_conversation_stats(session_id)
-        
-        return jsonify({
-            'stats': stats,
-            'timestamp': datetime.now().isoformat()
-        })
-        
-    except Exception as e:
-        logger.error(f'❌ Error obteniendo estadísticas: {e}')
-        return jsonify({
-            'error': 'Error obteniendo estadísticas',
-            'details': str(e)
-        }), 500
-
-@app.route('/api/rebuild-knowledge-base', methods=['POST'])
-@limiter.limit("1 per hour")
-def rebuild_knowledge_base():
-    """Reconstruir la base de conocimientos vectorial"""
-    try:
-        logger.info('🔄 Iniciando reconstrucción de base de conocimientos...')
-        
-        success = hr_agent.rebuild_knowledge_base()
-        
-        if success:
-            return jsonify({
-                'message': 'Base de conocimientos reconstruida exitosamente',
-                'timestamp': datetime.now().isoformat()
-            })
-        else:
-            return jsonify({
-                'error': 'Error reconstruyendo la base de conocimientos'
-            }), 500
-            
-    except Exception as e:
-        logger.error(f'❌ Error reconstruyendo base de conocimientos: {e}')
-        return jsonify({
-            'error': 'Error interno',
-            'details': str(e)
-        }), 500
-
-@app.route('/api/debug/sessions', methods=['GET'])
+@app.route('/api/debug/sessions')
+@limiter.exempt
 def debug_sessions():
-    """Debug: Información de todas las sesiones activas"""
+    """Debug endpoint para ver sesiones activas"""
     try:
-        sessions = memory_manager.get_all_sessions()
-        return jsonify({
-            'active_sessions': len(sessions),
-            'sessions': sessions,
-            'timestamp': datetime.now().isoformat()
-        })
-    except Exception as e:
-        logger.error(f'❌ Error obteniendo debug de sesiones: {e}')
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/debug/vector-search', methods=['POST'])
-def debug_vector_search():
-    """Debug: Probar búsqueda vectorial directamente"""
-    try:
-        data = request.get_json()
-        query = data.get('query', '')
-        k = data.get('k', 3)
+        sessions_info = {}
         
-        if not query:
-            return jsonify({'error': 'Query requerido'}), 400
-        
-        results = document_search.search(query, k)
-        context = document_search.get_context(results)
+        # Obtener info de todas las sesiones (simplificado)
+        for session_id in ['default']:  # Por ahora solo default
+            try:
+                info = hr_agent_simple.get_conversation_stats(session_id)
+                sessions_info[session_id] = info
+            except:
+                sessions_info[session_id] = {'status': 'inactive'}
         
         return jsonify({
-            'query': query,
-            'results_count': len(results),
-            'results': results,
-            'context': context,
+            'active_sessions': sessions_info,
             'timestamp': datetime.now().isoformat()
         })
         
     except Exception as e:
-        logger.error(f'❌ Error en debug vector search: {e}')
+        logger.error(f"❌ Error en debug endpoint: {e}")
         return jsonify({'error': str(e)}), 500
 
-def validate_configuration():
-    """Validate configuration before starting"""
-    required_vars = [
-        'AZURE_OPENAI_ENDPOINT',
-        'AZURE_OPENAI_KEY',
-        'AZURE_OPENAI_DEPLOYMENT',
-        'AZURE_OPENAI_API_VERSION'
-    ]
-    
-    missing_vars = [var for var in required_vars if not os.getenv(var)]
-    
-    if missing_vars:
-        logger.error(f"❌ Missing environment variables: {missing_vars}")
-        return False
-    
-    logger.info("✅ Configuration validated successfully")
-    return True
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    """Manejar rate limit exceeded"""
+    return jsonify({
+        'error': 'Demasiadas peticiones. Por favor espera antes de intentar de nuevo.',
+        'retry_after': str(e.retry_after) if hasattr(e, 'retry_after') else '60'
+    }), 429
 
-def initialize_components():
-    """Initialize LangChain components"""
+@app.errorhandler(500)
+def internal_error_handler(e):
+    """Manejar errores internos"""
+    logger.error(f"❌ Error interno: {e}")
+    return jsonify({
+        'error': 'Error interno del servidor',
+        'timestamp': datetime.now().isoformat()
+    }), 500
+
+def initialize_app():
+    """Inicializar aplicación"""
     try:
-        # Try to load or create vectorstore
-        logger.info("🔄 Initializing vector search...")
-        success = document_search.load_vectorstore()
-        if not success:
-            logger.warning("⚠️ Could not initialize vectorstore")
-        else:
-            logger.info("✅ Vector search initialized")
+        # Validar configuración
+        if not validate_config():
+            raise ValueError("Configuración de Azure OpenAI inválida")
         
-        logger.info("✅ LangChain components initialized")
+        logger.info("✅ Configuración validada exitosamente")
+        logger.info("✅ Agente HR Simplificado inicializado")
         return True
         
     except Exception as e:
-        logger.error(f"❌ Error initializing components: {e}")
+        logger.error(f"❌ Error inicializando aplicación: {e}")
         return False
 
 if __name__ == '__main__':
-    # Validate configuration
-    if not validate_configuration():
+    print("🚀 Iniciando HAVAS Chatbot Simplificado...")
+    
+    if not initialize_app():
+        print("❌ Error en la inicialización. Revisa la configuración.")
         exit(1)
     
-    # Initialize components
-    if not initialize_components():
-        logger.warning("⚠️ Some components did not initialize correctly")
-    
-    # Server configuration
+    # Configuración del servidor
     port = int(os.getenv('PORT', 3000))
-    debug = os.getenv('FLASK_ENV') == 'development'
+    debug_mode = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'
     
-    logger.info(f'🚀 HAVAS Chatbot with LangChain running on http://localhost:{port}')
-    logger.info(f'📊 Environment: {"development" if debug else "production"}')
-    logger.info(f'🔧 Available endpoints:')
-    logger.info(f'   - Chat: http://localhost:{port}/api/chat')
-    logger.info(f'   - Health: http://localhost:{port}/api/health')
-    logger.info(f'   - Debug: http://localhost:{port}/api/debug/sessions')
+    logger.info(f"🚀 HAVAS Chatbot Simplificado ejecutándose en http://localhost:{port}")
+    logger.info(f"📊 Modo debug: {debug_mode}")
+    logger.info("🔧 Endpoints disponibles:")
+    logger.info(f"   - Chat: http://localhost:{port}/api/chat")
+    logger.info(f"   - Health: http://localhost:{port}/api/health")
+    logger.info(f"   - Debug: http://localhost:{port}/api/debug/sessions")
     
     app.run(
         host='0.0.0.0',
         port=port,
-        debug=debug
+        debug=debug_mode
     )

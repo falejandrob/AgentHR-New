@@ -175,10 +175,14 @@ class VectorDocumentSearch:
             logger.info("🔄 Attempting to recreate vectorstore...")
             return self.create_vectorstore()
     
-    def search(self, query: str, k: int = 5) -> List[Dict]:
+    def search(self, query: str, k: int = None) -> List[Dict]:
         """
         Search similar documents using vector search or keyword search
         """
+        # Use environment variable or default
+        if k is None:
+            k = int(os.getenv("SEARCH_RESULTS_COUNT", "15"))
+            
         try:
             if self.use_keyword_search:
                 return self._keyword_search(query, k)
@@ -210,7 +214,7 @@ class VectorDocumentSearch:
             logger.error(f"❌ Error en búsqueda vectorial: {e}")
             return self._keyword_search(query, k)
     
-    def _keyword_search(self, query: str, k: int = 5) -> List[Dict]:
+    def _keyword_search(self, query: str, k: int = 15) -> List[Dict]:
         """
         Búsqueda por palabras clave como fallback
         """

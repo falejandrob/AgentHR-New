@@ -1,222 +1,193 @@
 """
-Main HR agent enhanced with LangChain
-Integrates vector search, memory and intelligent processing
+Agente HR Simplificado para o3-mini
+Eliminando dependencias innecesarias y simplificando la arquitectura
 """
+import os
 import logging
-from typing import Dict, Optional, List
 from datetime import datetime
+from typing import Dict, List, Any, Optional
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import HumanMessage, SystemMessage
 
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
-from langchain.schema import HumanMessage, AIMessage
+# Imports optimizados
+from tools.azure_search import AzureSearchClient
+from memory.simple_memory import SimpleMemoryManager
 
-from config.langchain_config import (
-    get_azure_llm, 
-    get_translation_llm, 
-    SYSTEM_PROMPT,
-    LANGUAGE_DETECTION_PROMPT,
-    TRANSLATION_PROMPT
-)
-from tools.vector_search import document_search
-try:
-    from tools.azure_search import azure_search
-except Exception:
-    azure_search = None  # Fallback si no está disponible
-from memory.conversation_memory import memory_manager
-
+# Setup logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class HRAgent:
+class HRAgentSimple:
+    """
+    Agente HR simplificado optimizado para o3-mini
+    """
+    
     def __init__(self):
-        import os
-        self.main_llm = get_azure_llm()
-        self.translation_disabled = os.getenv("DISABLE_TRANSLATION", "false").lower() == "true" or \
-            os.getenv("AZURE_SEARCH_VECTOR", "false").lower() == "true"
-        # Only initialize translation LLM if it's enabled
-        if not self.translation_disabled:
-            self.translation_llm = get_translation_llm()
-        else:
-            self.translation_llm = None
-        # Main chains
-        self.qa_chain = self._create_qa_chain()
-        if not self.translation_disabled:
-            self.language_detection_chain = self._create_language_detection_chain()
-            self.translation_chain = self._create_translation_chain()
-        else:
-            self.language_detection_chain = None
-            self.translation_chain = None
-        logger.info("🤖 HRAgent initialized with LangChain (translation_disabled=%s)" % self.translation_disabled)
-    
-    def _create_qa_chain(self) -> LLMChain:
-        """
-        Create main chain for Q&A responses
-        """
-        prompt = PromptTemplate(
-            input_variables=["context", "chat_history", "question"],
-            template=SYSTEM_PROMPT
-        )
+        logger.info("🚀 Inicializando HRAgent Simplificado...")
         
-        return LLMChain(
-            llm=self.main_llm,
-            prompt=prompt,
-            verbose=False
-        )
-    
-    def _create_language_detection_chain(self) -> LLMChain:
-        """
-        Create chain for language detection
-        """
-        prompt = PromptTemplate(
-            input_variables=["text"],
-            template=LANGUAGE_DETECTION_PROMPT
-        )
+        # Inicializar búsqueda de documentos
+        self.document_search = AzureSearchClient()
         
-        return LLMChain(
-            llm=self.translation_llm,
-            prompt=prompt,
-            verbose=False
-        )
-    
-    def _create_translation_chain(self) -> LLMChain:
-        """
-        Create chain for translation
-        """
-        prompt = PromptTemplate(
-            input_variables=["text", "source_lang", "target_lang"],
-            template=TRANSLATION_PROMPT
-        )
+        # Inicializar memoria simple
+        self.memory_manager = SimpleMemoryManager()
         
-        return LLMChain(
-            llm=self.translation_llm,
-            prompt=prompt,
-            verbose=False
-        )
+        # Configurar LLM simplificado
+        self.llm = self._setup_llm()
+        
+        # Sistema de prompts simplificado
+        self.system_prompt = """Eres un asistente de recursos humanos especializado en HAVAS.
+Responde SIEMPRE en el idioma en que te pregunten.
+Si te preguntan en español, responde en español.
+Si te preguntan en francés, responde en francés.
+
+Usa la información proporcionada para dar respuestas precisas y útiles.
+Si no tienes información suficiente, dilo claramente."""
+
+        logger.info("✅ HRAgent Simplificado inicializado correctamente")
     
-    def detect_language(self, message: str) -> str:
-        """
-        Detect message language
-        """
+    def _setup_llm(self):
+        """Configurar LLM simplificado para o3-mini"""
         try:
-            if self.translation_disabled or not self.language_detection_chain:
-                return 'unknown'
-            result = self.language_detection_chain.invoke({"text": message})
-            detected_lang = result["text"].strip().lower()
-            logger.info(f"🌐 Language detected: {detected_lang}")
-            return detected_lang
+            from config.langchain_config import get_azure_llm
+            llm = get_azure_llm()
+            logger.info("✅ LLM configurado correctamente")
+            return llm
         except Exception as e:
-            logger.error(f"❌ Error detecting language: {e}")
-            return 'fr'  # Default to French
-    
-    def translate_text(self, text: str, target_lang: str, source_lang: str = 'auto') -> str:
-        """
-        Translate text using LangChain
-        """
-        try:
-            if self.translation_disabled or not self.translation_chain:
-                return text
-            result = self.translation_chain.invoke({
-                "text": text,
-                "source_lang": source_lang,
-                "target_lang": target_lang
-            })
-            return result["text"].strip()
-        except Exception as e:
-            logger.error(f"❌ Error translating text: {e}")
-            return text  # Return original text if fails
+            logger.error(f"❌ Error configurando LLM: {e}")
+            raise
     
     def process_message(self, message: str, session_id: str = "default") -> Dict:
         """
-        Process complete message with enhanced pipeline
+        Procesar mensaje de forma simplificada
         """
         start_time = datetime.now()
         
         try:
-            if self.translation_disabled:
-                detected_language = 'original'
-                search_query = message  # Process directly
-                logger.info("📩 Processing message without translation (vector/disabled)")
+            logger.info(f"📩 Procesando mensaje: {message[:50]}...")
+            
+            # 1. Buscar documentos relevantes
+            search_results = self.document_search.search(message)
+            logger.info(f"🔍 Encontrados {len(search_results)} documentos relevantes")
+            
+            # 2. Preparar contexto
+            context = self._prepare_context(search_results)
+            
+            # 3. Obtener historial de conversación
+            conversation_history = self.memory_manager.get_conversation_history(session_id)
+            
+            # 4. Crear prompt simplificado
+            messages = []
+            messages.append(SystemMessage(content=self.system_prompt))
+            
+            # Agregar historial si existe
+            for hist_msg in conversation_history[-4:]:  # Solo últimos 4 mensajes
+                messages.append(HumanMessage(content=f"Usuario: {hist_msg['human']}"))
+                messages.append(SystemMessage(content=f"Asistente: {hist_msg['ai']}"))
+            
+            # Agregar contexto y pregunta actual
+            if context:
+                context_msg = f"Información relevante:\n{context}\n\nPregunta del usuario: {message}"
             else:
-                detected_language = self.detect_language(message)
-                logger.info(f"📩 Processing message in {detected_language}")
-                # Use original message for search - no need to translate for search
-                search_query = message
+                context_msg = f"Pregunta del usuario: {message}"
             
-            # 3. Document retrieval (Azure AI Search preferred)
-            use_azure = bool(azure_search and getattr(azure_search, 'enabled', False))
-            search_results = []
-            context = ""
-            if use_azure:
-                search_results = azure_search.search(search_query, k=5)
-                context = azure_search.get_context(search_results, max_length=3000)
-                logger.info(f"📦 Context source: Azure AI Search ({len(search_results)} docs)")
-            # Fallback if Azure returned no results
-            if not search_results and not (use_azure and getattr(azure_search, 'only_mode', False)):
-                search_results = document_search.search(search_query, k=5)
-                context = document_search.get_context(search_results, max_length=3000)
-                logger.info(f"📦 Context source: Local vectorstore ({len(search_results)} docs)")
-            logger.info(f"🔍 Found {len(search_results)} relevant documents")
+            messages.append(HumanMessage(content=context_msg))
             
-            # 4. Get conversation history
-            chat_history = memory_manager.get_conversation_history(session_id)
+            # 5. Generar respuesta
+            response = self._generate_response(messages)
             
-            # 5. Generate response using Q&A chain - let the model respond in the original language
-            final_response = self.qa_chain.invoke({
-                "context": context or "No specific information found in the knowledge base.",
-                "chat_history": chat_history,
-                "question": message  # Use original message so the model responds in the same language
-            })["text"]
+            # 6. Guardar en memoria
+            self.memory_manager.add_message(session_id, message, response)
             
-            
-            # 6. Save in memory
-            memory_manager.add_message(session_id, message, final_response)
-            
-            # Processing metrics
+            # 7. Preparar resultado
             processing_time = (datetime.now() - start_time).total_seconds()
             
             result = {
-                'response': final_response,
+                'response': response,
                 'documentsFound': len(search_results),
                 'hasContext': bool(context),
-                'language': {
-                    'detected': None if self.translation_disabled else detected_language,
-                    'processed_directly': True,  # No translation needed
-                    'original_message': message
-                },
-                'session_info': memory_manager.get_session_info(session_id),
+                'session_info': self.memory_manager.get_session_info(session_id),
                 'processing_time': round(processing_time, 2),
                 'timestamp': datetime.now().isoformat()
             }
             
-            logger.info(f"✅ Message processed successfully in {processing_time:.2f}s - Response in {detected_language}")
+            logger.info(f"✅ Mensaje procesado exitosamente en {processing_time:.2f}s")
             return result
             
         except Exception as e:
-            logger.error(f"❌ Error processing message: {e}")
+            logger.error(f"❌ Error procesando mensaje: {e}")
             return {
-                'error': 'Internal server error',
+                'error': 'Error interno del servidor',
                 'details': str(e),
                 'timestamp': datetime.now().isoformat()
             }
     
+    def _prepare_context(self, search_results: List[Dict]) -> str:
+        """Preparar contexto de documentos encontrados"""
+        if not search_results:
+            return ""
+        
+        context_parts = []
+        for i, doc in enumerate(search_results[:3], 1):  # Solo primeros 3
+            content = doc.get('content', '').strip()
+            if content:
+                context_parts.append(f"Documento {i}:\n{content}\n")
+        
+        return "\n".join(context_parts)
+    
+    def _generate_response(self, messages: List) -> str:
+        """
+        Generar respuesta con manejo robusto de errores para o3-mini
+        """
+        try:
+            # Intentar generar respuesta
+            result = self.llm.invoke(messages)
+            
+            # Manejo robusto de diferentes tipos de respuesta
+            if result is None:
+                logger.warning("⚠️ El modelo devolvió None")
+                return "Lo siento, no pude generar una respuesta en este momento. Por favor intenta de nuevo."
+            
+            # Si es string directamente
+            if isinstance(result, str):
+                response = result.strip()
+                if response:
+                    return response
+                else:
+                    return "No pude generar una respuesta adecuada. Por favor reformula tu pregunta."
+            
+            # Si tiene atributo content
+            if hasattr(result, 'content'):
+                response = result.content
+                if isinstance(response, str) and response.strip():
+                    return response.strip()
+                else:
+                    return "No pude generar una respuesta adecuada. Por favor reformula tu pregunta."
+            
+            # Si es dict con 'content'
+            if isinstance(result, dict) and 'content' in result:
+                response = result['content']
+                if isinstance(response, str) and response.strip():
+                    return response.strip()
+                else:
+                    return "No pude generar una respuesta adecuada. Por favor reformula tu pregunta."
+            
+            # Fallback
+            logger.warning(f"⚠️ Formato de respuesta inesperado: {type(result)}")
+            return "Lo siento, hubo un problema técnico. Por favor intenta de nuevo."
+            
+        except Exception as e:
+            logger.error(f"❌ Error generando respuesta: {e}")
+            return "Lo siento, encontré un problema técnico. Por favor intenta de nuevo en un momento."
+    
     def start_new_conversation(self, session_id: str = "default"):
-        """
-        Start new conversation by clearing memory
-        """
-        memory_manager.clear_session(session_id)
-        logger.info(f"🔄 New conversation started for session: {session_id}")
+        """Iniciar nueva conversación"""
+        self.memory_manager.clear_session(session_id)
+        logger.info(f"🔄 Nueva conversación iniciada para sesión: {session_id}")
     
     def get_conversation_stats(self, session_id: str = "default") -> Dict:
-        """
-        Get conversation statistics
-        """
-        return memory_manager.get_session_info(session_id)
-    
-    def rebuild_knowledge_base(self) -> bool:
-        """
-        Rebuild knowledge base
-        """
-        logger.info("🔄 Rebuilding knowledge base...")
-        return document_search.rebuild_index()
+        """Obtener estadísticas de conversación"""
+        return self.memory_manager.get_session_info(session_id)
 
-# Global agent instance
-hr_agent = HRAgent()
+
+# Instancia global del agente
+hr_agent_simple = HRAgentSimple()

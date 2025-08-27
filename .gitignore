@@ -22,3 +22,4 @@ tools/__pycache__/azure_search.cpython-39.pyc
 tools/__pycache__/azure_search.cpython-310.pyc
 tools/__pycache__/vector_search.cpython-39.pyc
 tools/__pycache__/vector_search.cpython-310.pyc
+memory/__pycache__/simple_memory.cpython-310.pyc
